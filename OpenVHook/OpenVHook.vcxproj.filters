@@ -133,6 +133,8 @@
     <ClInclude Include="..\SDK\inc\types.h">
       <Filter>SDK</Filter>
     </ClInclude>
+    <ClInclude Include="resource.h" />
+    <ClInclude Include="Pools.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\README.md" />

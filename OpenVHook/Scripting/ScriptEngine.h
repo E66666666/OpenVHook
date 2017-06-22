@@ -7,6 +7,17 @@
 #include "pgCollection.h"
 #include "NativeInvoker.h"
 
+// I should NOT be doing this shit
+
+extern __int64* g_entityPoolAddress;
+
+extern __int64* g_vehiclePoolAddress;
+extern __int64* g_pedPoolAddress;
+extern __int64* g_objectPoolAddress;
+extern __int64* g_pickupPoolAddress;
+
+extern int(*g_addEntityToPoolFunc)(uint64_t address);
+
 struct GlobalTable
 {
 	__int64** GlobalBasePtr;
@@ -14,7 +25,7 @@ struct GlobalTable
 	bool IsInitialised()const { return *GlobalBasePtr != NULL; }
 };
 
-extern GlobalTable globalTable;
+extern GlobalTable g_globalTable;
 //extern uint64_t * g_globalPtr;
 
 enum eGameState {

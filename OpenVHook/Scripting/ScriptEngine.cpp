@@ -6,7 +6,15 @@
 
 using namespace Utility;
 
-GlobalTable globalTable;
+GlobalTable g_globalTable;
+
+__int64* g_entityPoolAddress;
+__int64* g_vehiclePoolAddress;
+__int64* g_pedPoolAddress;
+__int64* g_objectPoolAddress;
+__int64* g_pickupPoolAddress;
+
+int(*g_addEntityToPoolFunc)(uint64_t address);
 
 static pgPtrCollection<ScriptThread> * scrThreadCollection;
 static uint32_t activeThreadTlsOffset;
@@ -47,6 +55,14 @@ bool ScriptEngine::Initialize() {
 	auto gameStatePattern =				pattern("83 3D ? ? ? ? ? 8A D9 74 0A");
 	auto getScriptIdBlock =				pattern("80 78 32 00 75 34 B1 01 E8");
 	auto g_globalPtrPattern =			pattern("4C 8D 05 ? ? ? ? 4D 8B 08 4D 85 C9 74 11");
+
+	auto g_entityPoolAddressPattern =	pattern("4C 8B 0D ? ? ? ? 44 8B C1 49 8B 41 08");
+	auto g_vehiclePoolAddressPattern =	pattern("48 8B 05 ? ? ? ? F3 0F 59 F6 48 8B 08");
+	auto g_pedPoolAddressPattern =		pattern("48 8B 05 ? ? ? ? 41 0F BF C8 0F BF 40 10");
+	auto g_objectPoolAddressPattern =	pattern("48 8B 05 ? ? ? ? 8B 78 10 85 FF");
+	auto g_pickupPoolAddressPattern =	pattern("8B F0 48 8B 05 ? ? ? ? F3 0F 59 F6");
+
+	auto g_addEntityToPoolFuncPattern =	pattern("48 F7 F9 49 8B 48 08 48 63 D0 C1 E0 08 0F B6 1C 11 03 D8");
 
 	executable_meta executable;
 	executable.EnsureInit();
@@ -142,13 +158,60 @@ bool ScriptEngine::Initialize() {
 	// Get global ptr
 	location = g_globalPtrPattern.count(1).get(0).get<char>(0);
 	if (location == nullptr) {
-
 		LOG_ERROR("Unable to find g_globalPtr");
 		return false;
 	}
-	//g_globalPtr = reinterpret_cast<decltype(g_globalPtr)>(location + *(int32_t*)(location + 3) + 7);
-	globalTable.GlobalBasePtr = (__int64**)(location + *(int*)(location + 3) + 7);
-	LOG_DEBUG("g_globalPtr\t 0x%p (0x%.8X)", globalTable.GlobalBasePtr, reinterpret_cast<uintptr_t>(globalTable.GlobalBasePtr) - executable.begin());
+	g_globalTable.GlobalBasePtr = (__int64**)(location + *(int*)(location + 3) + 7);
+	LOG_DEBUG("g_globalPtr\t\t 0x%p (0x%.8X)", g_globalTable.GlobalBasePtr, reinterpret_cast<uintptr_t>(g_globalTable.GlobalBasePtr) - executable.begin());
+
+
+	location = g_entityPoolAddressPattern.count(1).get(0).get<char>(0);
+	if (location == nullptr) {
+		LOG_ERROR("Unable to find g_entityPoolAddress");
+		return false;
+	}
+	g_entityPoolAddress = reinterpret_cast<__int64 *>(*reinterpret_cast<int *>(location + 3) + location + 7);
+	LOG_DEBUG("g_entityPoolAddress\t 0x%p (0x%.8X)", g_entityPoolAddress, reinterpret_cast<uintptr_t>(g_entityPoolAddress) - executable.begin());
+
+	location = g_vehiclePoolAddressPattern.count(1).get(0).get<char>(0);
+	if (location == nullptr) {
+		LOG_ERROR("Unable to find g_vehiclePoolAddress");
+		return false;
+	}
+	g_vehiclePoolAddress = reinterpret_cast<__int64 *>(*reinterpret_cast<int *>(location + 3) + location + 7);
+	LOG_DEBUG("g_vehiclePoolAddress\t 0x%p (0x%.8X)", g_vehiclePoolAddress, reinterpret_cast<uintptr_t>(g_vehiclePoolAddress) - executable.begin());
+
+	location = g_pedPoolAddressPattern.count(1).get(0).get<char>(0);
+	if (location == nullptr) {
+		LOG_ERROR("Unable to find g_pedPoolAddress");
+		return false;
+	}
+	g_pedPoolAddress = reinterpret_cast<__int64 *>(*reinterpret_cast<int *>(location + 3) + location + 7);
+	LOG_DEBUG("g_pedPoolAddress\t 0x%p (0x%.8X)", g_pedPoolAddress, reinterpret_cast<uintptr_t>(g_pedPoolAddress) - executable.begin());
+
+	location = g_objectPoolAddressPattern.count(1).get(0).get<char>(0);
+	if (location == nullptr) {
+		LOG_ERROR("Unable to find g_objectPoolAddress");
+		return false;
+	}
+	g_objectPoolAddress = reinterpret_cast<__int64 *>(*reinterpret_cast<int *>(location + 3) + location + 7);
+	LOG_DEBUG("g_objectPoolAddress\t 0x%p (0x%.8X)", g_objectPoolAddress, reinterpret_cast<uintptr_t>(g_objectPoolAddress) - executable.begin());
+
+	location = g_pickupPoolAddressPattern.count(1).get(0).get<char>(0);
+	if (location == nullptr) {
+		LOG_ERROR("Unable to find g_pickupPoolAddress");
+		return false;
+	}
+	g_pickupPoolAddress = reinterpret_cast<__int64 *>(*reinterpret_cast<int *>(location + 5) + location + 9);
+	LOG_DEBUG("g_pickupPoolAddress\t 0x%p (0x%.8X)", g_pickupPoolAddress, reinterpret_cast<uintptr_t>(g_pickupPoolAddress) - executable.begin());
+
+	location = g_addEntityToPoolFuncPattern.count(1).get(0).get<char>(0);
+	if (location == nullptr) {
+		LOG_ERROR("Unable to find g_addEntityToPoolFunc");
+		return false;
+	}
+	g_addEntityToPoolFunc = reinterpret_cast<int(*)(uint64_t)>(location - 0x68);
+	LOG_PRINT("g_addEntityToPoolFunc\t 0x%p (0x%.8X)", g_addEntityToPoolFunc, reinterpret_cast<uintptr_t>(g_addEntityToPoolFunc) - executable.begin());
 
 	// Check if game is ready
 	LOG_PRINT("Checking if game is ready...");

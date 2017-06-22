@@ -2,6 +2,7 @@
 #include "ScriptEngine.h"
 #include "..\Utility\Log.h"
 #include "..\Utility\General.h"
+#include "../Pools.h"
 
 using namespace Utility;
 
@@ -18,7 +19,7 @@ void Script::Tick() {
 	if ( mainFiber == nullptr ) {
 		mainFiber = ConvertThreadToFiber( nullptr );
 	}
-
+	
 	if ( timeGetTime() < wakteAt ) {
 		return;
 	}
@@ -196,8 +197,8 @@ enum eGameVersion : int {
 	G_VER_1_0_1032_1_STEAM, // 32
 	G_VER_1_0_1032_1_NOSTEAM, // 33
 
-	G_VER_1_0_1103_2_STEAM, // 32
-	G_VER_1_0_1103_2_NOSTEAM, // 33
+	G_VER_1_0_1103_2_STEAM, // 34
+	G_VER_1_0_1103_2_NOSTEAM, // 35
 
 };
 
@@ -272,23 +273,76 @@ void ScriptManager::WndProc( HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam 
 	}
 }
 
-DLL_EXPORT uint64_t* getGlobalPtr(int index)
-{
-	return (uint64_t*)globalTable.AddressOf(index);
+DLL_EXPORT uint64_t* getGlobalPtr(int index) {
+	return (uint64_t*)g_globalTable.AddressOf(index);
 }
 
-// dummy pool functions (need implementation)
-int DLL_EXPORT worldGetAllVehicles(int* array, int arraySize)
-{
+// https://github.com/crosire/scripthookvdotnet/blob/dev_v3/source/core/NativeMemory.cpp
+int DLL_EXPORT worldGetAllVehicles(int* array, int arraySize) {
 	return 0;
+
+	// implement tls? return early 0 for now to prevent crashes from happening...
+	if (!g_vehiclePoolAddress || !g_entityPoolAddress) {
+		return 0;
+	}
+	if (!*g_vehiclePoolAddress || !*g_entityPoolAddress) {
+		return 0;
+	}
+	EntityPool *entityPool = (EntityPool *)(*g_entityPoolAddress);
+	VehiclePool *vehiclePool = *(VehiclePool **)(*g_vehiclePoolAddress);
+
+	for (uint32_t i = 0; i < vehiclePool->size; i++) {
+		if (entityPool->Full()) {
+			break;
+		}
+		if (i >= arraySize) {
+			break;
+		}
+		if (vehiclePool->isValid(i)) {
+			uint64_t address = vehiclePool->getAddress(i);
+			if (address) {
+				LOG_PRINT("Adding item...");
+				array[i] = g_addEntityToPoolFunc(address);
+			}
+		}
+	}
+	return vehiclePool->itemCount;
 }
 
 int DLL_EXPORT worldGetAllPeds(int* array, int arraySize)
 {
 	return 0;
+
+	if (!g_pedPoolAddress)
+		return 0;
+
+	array = (int*)g_pedPoolAddress;
+	GenericPool *pedPool = (GenericPool *)g_pedPoolAddress;
+	arraySize = pedPool->size;
+	//return pedPool->itemCount;
 }
 
 int DLL_EXPORT worldGetAllObjects(int* array, int arraySize)
 {
 	return 0;
+
+	if (!g_objectPoolAddress)
+		return 0;
+
+	array = (int*)g_objectPoolAddress;
+	GenericPool *objectPool = (GenericPool *)g_objectPoolAddress;
+	arraySize = objectPool->size;
+	//return objectPool->itemCount;
+}
+
+int DLL_EXPORT worldGetAllPickups(int *array, int arraySize) {
+	return 0;
+
+	if (!g_pickupPoolAddress)
+		return 0;
+
+	array = (int*)g_vehiclePoolAddress;
+	GenericPool *pickupPool = (GenericPool *)g_pickupPoolAddress;
+	arraySize = pickupPool->size;
+	//return pickupPool->itemCount;
 }
