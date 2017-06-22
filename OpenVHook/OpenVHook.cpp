@@ -1,5 +1,5 @@
 #include "Input\InputHook.h"
-#include "ASI Loader\ASILoader.h"
+// #include "ASI Loader\ASILoader.h"
 #include "Scripting\ScriptEngine.h"
 #include "Scripting\ScriptManager.h"
 #include "Utility\Console.h"
@@ -30,7 +30,7 @@ DWORD WINAPI Run() {
 
 	ScriptEngine::CreateThread( &g_ScriptManagerThread );
 
-	ASILoader::Initialize();
+	// ASILoader::Initialize();
 
 	LOG_PRINT( "Initialization finished" );
 
